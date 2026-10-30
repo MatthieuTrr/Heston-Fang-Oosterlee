@@ -95,3 +95,128 @@ def plot_temps_calcul(S0, K, T, r, kappa, lambdA, theta, sig_0, sig_sig, rho):
     plt.title("Temps de calcul de Heston-COS")
     plt.grid(alpha=0.3)
     plt.show()
+
+def smile_symetrique():
+    S0_smile = 100
+    r_smile = 0.03
+    T_smile = 1.0
+    kappa_smile = 2.0
+    lambdA_smile = 0.0
+    theta_smile = 0.04       # Volatilité moyen terme de 20%
+    sig_0_smile = 0.2        # Volatilité initiale de 20%
+    
+    # MODIFICATIONS CLÉS POUR LE SMILE EN "U" :
+    rho_smile = 0.0          # Corrélation nulle -> Symétrie parfaite autour de S0
+    sig_sig_smile = 0.5      # Vol of Vol plus forte -> Courbure / "U" bien marqué
+    
+    N_smile = 256
+    L_smile = 12
+    
+    # Grille de Strikes K (de 70 à 130 autour du prix SPOT S0=100)
+    K_grid = np.linspace(70, 130, 61)
+    vols_implicites = []
+    
+    for K_val in K_grid:
+        price_heston = P(S0_smile, K_val, T_smile, r_smile, kappa_smile, 
+                         lambdA_smile, theta_smile, sig_0_smile, sig_sig_smile, 
+                         rho_smile, N_smile, L_smile, call="False")
+        
+        vol_imp = implied_volatility(price_heston, S0_smile, K_val, r_smile, T_smile, option_type="put")
+        vols_implicites.append(vol_imp * 100) # Conversion en %
+        
+    plt.figure(figsize=(8, 5))
+    plt.plot(K_grid, vols_implicites, 'b-', linewidth=2, label=rf"Heston ($\rho = {rho_smile}$, $\sigma_\sigma = {sig_sig_smile}$)")
+    plt.axvline(S0_smile, color='gray', linestyle='--', alpha=0.7, label=f"Spot $S_0 = {S0_smile}$ (ATM)")
+    
+    plt.xlabel("Strike $K$")
+    plt.ylabel("Volatilité Implicite (%)")
+    plt.title(f"Smile de Volatilité Implicite Symétrique dans le modèle de Heston ($T = {T_smile}$ an)")
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.legend()
+    plt.show()
+
+def plot_smile_volvol(S0, r, T, kappa, lambdA, theta, sig_0,
+                     sig_sigs=(0.2, 0.4, 0.5751, 0.8),
+                     N=1024, L=12):
+    Ks = np.linspace(0.7*S0, 1.3*S0, 61)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    for ss in sig_sigs:
+        vols = []
+
+        for strike in Ks:
+            prix = P(
+                S0, strike, T, r,
+                kappa, lambdA, theta, sig_0, ss, 0,
+                N, L
+            )
+
+            vol = volatilite_implicite_put(prix, S0, strike, r, T)
+            vols.append(vol)
+
+        ax.plot(Ks, 100*np.array(vols), label=f"σ_σ = {ss:g}")
+
+    ax.set_xlabel("Strike K")
+    ax.set_ylabel("Volatilité implicite (%)")
+    ax.set_title("Effet de la vol-of-vol sur le smile (ρ=0)")
+    ax.grid(alpha=0.3)
+    ax.legend()
+
+def plot_convergence_N():
+    # Étape B : Étude de la convergence en fonction de N (à L fixe et grand)
+    N_values = np.array([4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 256])
+    L_fixed = 16  
+
+    errors_N = []
+    for N_val in N_values:
+        p_cos = P(S0, K, T, r, kappa, lambdA, theta, sig_0, sig_sig, rho, N=int(N_val), L=L_fixed)
+        # Conversion explicite en float pour éviter les conflits avec les types mpf
+        errors_N.append(float(abs(p_cos - prix_exact)))
+
+    errors_N = np.array(errors_N)
+
+    # Ajustement linéaire en échelle semi-log (log(erreur) = a * N + b)
+    mask = errors_N > 1e-12
+    coeffs = np.polyfit(N_values[mask], np.log(errors_N[mask]), 1)
+    y_theo = np.exp(coeffs[1]) * np.exp(coeffs[0] * N_values)
+
+    # Tracé
+    plt.figure(figsize=(8, 5))
+    plt.semilogy(N_values, errors_N, 'o-', color='b', label="Erreur absolue |P_COS - P_exact|")
+    plt.semilogy(N_values, y_theo, '--', color='darkorange', label=f"Tendance théorique $\propto e^{{{coeffs[0]:.2f} N}}$")
+    plt.xlabel("N (Nombre de termes de Fourier-Cosinus)")
+    plt.ylabel("Erreur absolue (échelle log)")
+    plt.title(f"Ordre de convergence de la méthode COS selon N (L = {L_fixed})")
+    plt.grid(True, which="both", ls="--", alpha=0.5)
+    plt.legend()
+    plt.show()
+
+def plot_convergence_L():
+    # Étape C : Étude de la convergence en fonction de L (à N fixe et grand)
+    L_values = np.linspace(2, 16, 15)  
+    N_fixed = 512  
+
+    errors_L = []
+    for L_val in L_values:
+        p_cos = P(S0, K, T, r, kappa, lambdA, theta, sig_0, sig_sig, rho, N=N_fixed, L=L_val)
+        # Conversion explicite en float pour éviter les conflits avec les types mpf
+        errors_L.append(float(abs(p_cos - prix_exact)))
+
+    errors_L = np.array(errors_L)
+
+    # Ajustement linéaire en échelle semi-log pour la tendance e^{-\alpha L}
+    mask_L = errors_L > 1e-12
+    coeffs_L = np.polyfit(L_values[mask_L], np.log(errors_L[mask_L]), 1)
+    y_theo_L = np.exp(coeffs_L[1]) * np.exp(coeffs_L[0] * L_values)
+
+    # Tracé
+    plt.figure(figsize=(8, 5))
+    plt.semilogy(L_values, errors_L, 's-', color='r', label="Erreur absolue |P_COS - P_exact|")
+    plt.semilogy(L_values, y_theo_L, '--', color='darkblue', label=f"Tendance théorique $\propto e^{{{coeffs_L[0]:.2f} L}}$")
+    plt.xlabel("L (Largeur de l'intervalle de troncature)")
+    plt.ylabel("Erreur absolue (échelle log)")
+    plt.title(f"Ordre de convergence de la méthode COS selon L (N = {N_fixed})")
+    plt.grid(True, which="both", ls="--", alpha=0.5)
+    plt.legend()
+    plt.show()
