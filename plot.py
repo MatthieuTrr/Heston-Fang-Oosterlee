@@ -27,7 +27,7 @@ def plot_convergence_bs(S0, K, T, r, kappa, lambdA, theta, sig_0, N):
     #plt.axhline(put_bs, color="red", linestyle="--", label=f"Asymptote : prix Black-Scholes = {put_bs:.4f}")
     plt.gca().invert_xaxis()   # on lit le graphique de sig_sig élevé vers 0
     plt.xlabel(r"$\sigma_\sigma$ (volatilité de la volatilité)")
-    plt.ylabel("Prix du put")
+    plt.ylabel("L'écart entre prix Black-Scholes et prix Heston")
     plt.title(r"Convergence du prix Heston vers Black-Scholes quand $\sigma_\sigma \to 0$")
     plt.legend()
     plt.grid(alpha=0.3)
