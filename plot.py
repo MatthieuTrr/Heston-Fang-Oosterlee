@@ -1,4 +1,4 @@
-from time import perf_counter
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,17 +9,14 @@ from src.implied_vol import volatilite_implicite_put
 
 
 def plot_convergence_bs(S0, K, T, r, kappa, lambdA, theta, sig_0, N):
-    # Valeurs de sig_sig : de 1.0 (élevé, Feller violée) jusqu'à 0.001 (proche de 0)
-    # On s'arrête à 1e-3 : en dessous, l'annulation numérique dans (h-D)/sig_sig**2 dégrade le résultat
+    
     sig_sig_grid = np.linspace(1.0, 0.001, 100)
 
-    # Prix Heston (put) pour chaque sig_sig, les autres paramètres restant ceux de la cellule des paramètres
     prix_heston = np.array([
         P(S0, K, T, r, kappa, lambdA, theta, sig_0, ss, 0, N)
         for ss in sig_sig_grid
     ])
 
-    # Asymptote : prix Black-Scholes (put) de volatilité sig_0 (valable car sig_0**2 = theta et lambdA = 0)
     put_bs, _ = black_scholes(S0, K, r, T, sig_0)
 
     plt.figure(figsize=(8, 5))
@@ -38,10 +35,7 @@ def plot_convergence_bs(S0, K, T, r, kappa, lambdA, theta, sig_0, N):
 
 def plot_smile_rho(S0, r, T, kappa, lambdA, theta, sig_0, sig_sig,
                    rhos=(-0.7, 0, 0.7), N=1024, L=12, n_strikes=31):
-    """
-    Smile de volatilité implicite (put) pour plusieurs valeurs de rho :
-    influence de la corrélation sur la forme du smile.
-    """
+   
     strikes_rho = np.linspace(0.85*S0, 1.15*S0, n_strikes)
 
     plt.figure()
@@ -76,16 +70,20 @@ def plot_smile_rho(S0, r, T, kappa, lambdA, theta, sig_0, sig_sig,
     plt.show()
 
 
-def plot_temps_calcul(S0, K, T, r, kappa, lambdA, theta, sig_0, sig_sig, rho):
+def plot_temps_calcul(S0, K, T, r, kappa, lambdA, theta,
+                      sig_0, sig_sig, rho):
     Ns = [32, 64, 128, 256, 512, 1024, 2048]
     temps_moyens = []
 
     for n in Ns:
-        debut = perf_counter()
-        for _ in range(100):
-            P(S0, K, T, r, kappa, lambdA, theta, sig_0, sig_sig, rho, n)
-        temps_ms = 1000 * (perf_counter() - debut) / 100
+        debut = time.time()
+
+        for i in range(100):
+            P(S0, K, T, r, kappa, lambdA, theta,sig_0, sig_sig, rho, n)
+
+        temps_ms = 1000 * (time.time() - debut) / 100
         temps_moyens.append(temps_ms)
+
         print(f"N={n:4d} | Temps moyen={temps_ms:.4f} ms")
 
     plt.figure()
@@ -105,7 +103,7 @@ def smile_symetrique():
     theta_smile = 0.04       # Volatilité moyen terme de 20%
     sig_0_smile = 0.2        # Volatilité initiale de 20%
     
-    # MODIFICATIONS CLÉS POUR LE SMILE EN "U" :
+    
     rho_smile = 0.0          # Corrélation nulle -> Symétrie parfaite autour de S0
     sig_sig_smile = 0.5      # Vol of Vol plus forte -> Courbure / "U" bien marqué
     
@@ -164,7 +162,7 @@ def plot_smile_volvol(S0, r, T, kappa, lambdA, theta, sig_0,
     ax.legend()
 
 def plot_convergence_N():
-    # Étape B : Étude de la convergence en fonction de N (à L fixe et grand)
+    #Étude de la convergence en fonction de N (à L fixe et grand)
     N_values = np.array([4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 256])
     L_fixed = 16  
 
@@ -193,7 +191,7 @@ def plot_convergence_N():
     plt.show()
 
 def plot_convergence_L():
-    # Étape C : Étude de la convergence en fonction de L (à N fixe et grand)
+    #Étude de la convergence en fonction de L (à N fixe et grand)
     L_values = np.linspace(2, 16, 15)  
     N_fixed = 512  
 
